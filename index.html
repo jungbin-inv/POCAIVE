@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>POCAIVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: 상단 요약 → 좌 입력 카드 / 우 현재 재고, 아래 출입 내역. 모바일은 한 줄로 쌓임 */
+:root{
+  --bg:#f7f4f3; --surface:#ffffff; --surface-2:#f1ecea; --line:#e3dad7;
+  --fg:#26201f; --muted:#766965; --accent:#d9533c; --accent-ink:#ffffff; --accent-soft:#fde6df;
+  --in:#1d7a55; --in-soft:#dff3ea; --out:#b52f52; --out-soft:#fbe3ea; --warn:#9a6a00;
+  --font-body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#171312; --surface:#211b1a; --surface-2:#2c2422; --line:#3d3330;
+  --fg:#f2ebe9; --muted:#b3a5a1; --accent:#ff8a70; --accent-ink:#2a0d06; --accent-soft:#3b211a;
+  --in:#5fd3a2; --in-soft:#173328; --out:#ff7d98; --out-soft:#3a1822; --warn:#e8b84a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#171312; --surface:#211b1a; --surface-2:#2c2422; --line:#3d3330;
+  --fg:#f2ebe9; --muted:#b3a5a1; --accent:#ff8a70; --accent-ink:#2a0d06; --accent-soft:#3b211a;
+  --in:#5fd3a2; --in-soft:#173328; --out:#ff7d98; --out-soft:#3a1822; --warn:#e8b84a; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+h2{font-size:15px;margin:0;font-weight:700}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--in)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:24px;font-weight:600;margin-top:2px}
+.stat .v small{font-size:13px;color:var(--muted);font-weight:500;margin-left:2px;font-family:var(--font-body)}
+.stat.total{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.stat.total .k,.stat.total .v small{color:inherit;opacity:.7}
+.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:20px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.card-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+form{display:flex;flex-direction:column;gap:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+input,select{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.qty-row{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:8px}
+.hint{font-size:12px;color:var(--muted);min-height:18px}
+.hint.err{color:var(--out)}
+.hint b{color:var(--fg);font-family:var(--font-num)}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);padding:8px 12px;font-weight:600}
+button:disabled{opacity:.45;cursor:not-allowed}
+.b-in{background:var(--in);border-color:var(--in);color:var(--surface);padding:12px}
+.b-out{background:var(--out);border-color:var(--out);color:var(--surface);padding:12px}
+.flash{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--surface-2)}
+.flash.ok{background:var(--in-soft);color:var(--in)}
+.flash.bad{background:var(--out-soft);color:var(--out)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input{width:180px}
+.tools select{width:auto}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;padding:5px 10px;border-radius:999px;font-weight:500;background:transparent}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px;max-height:560px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface-2);font-size:12px;color:var(--muted);font-weight:600;z-index:1}
+th.r,td.r{text-align:right}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr:last-child td{border-bottom:0}
+.g{font-weight:600}
+.cat{font-size:11px;color:var(--muted);background:var(--surface-2);border-radius:4px;padding:2px 6px}
+.bar{height:4px;background:var(--surface-2);border-radius:2px;width:80px;display:inline-block;vertical-align:middle;margin-left:8px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.pill.in{background:var(--in-soft);color:var(--in)}
+.pill.out{background:var(--out-soft);color:var(--out)}
+.qin{color:var(--in);font-weight:600}
+.qout{color:var(--out);font-weight:600}
+.zero{color:var(--muted)}
+.mini{padding:3px 8px;font-size:12px;font-weight:600}
+.mini.in{color:var(--in)} .mini.out{color:var(--out)}
+.mini.del{color:var(--muted);font-weight:500}
+.mini.del.arm{color:var(--surface);background:var(--out);border-color:var(--out)}
+.memo{color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+.muted{color:var(--muted)}
+.major{font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:2px 6px;margin-left:6px}
+.star{border:0;background:transparent;padding:2px 4px;font-size:15px;color:var(--line);line-height:1}
+.star.on{color:var(--accent)}
+.star:disabled{opacity:1;cursor:default}
+.majorpanel{display:flex;flex-direction:column;gap:10px;background:var(--surface-2);border-radius:8px;padding:14px;margin-bottom:12px;font-size:13px}
+.majorpanel p{margin:0}
+.majorpanel input[type=file]{background:var(--surface)}
+.catv{font-size:12px}
+.bulk{display:flex;flex-direction:column;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.ok-t{color:var(--in);font-size:12px}
+.bad-t{color:var(--out);font-size:12px}
+tr.bad td{background:var(--out-soft)}
+th.sub{font-weight:500}
+.foot{font-size:12px;color:var(--muted)}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>POCAIVE</h1>
+      <p>그룹별 포토카드 입고·반출을 기록하면 현재 재고가 자동으로 누적 계산돼요.</p>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">연결 중…</span></div>
+  </header>
+
+  <section class="stats" aria-label="요약">
+    <div class="stat total"><div class="k">현재 총 재고</div><div class="v num" id="sTotal">–<small>장</small></div></div>
+    <div class="stat"><div class="k">재고 보유 그룹</div><div class="v num" id="sGroups">–<small>개</small></div></div>
+    <div class="stat"><div class="k">오늘 입고</div><div class="v num" id="sIn" style="color:var(--in)">–<small>장</small></div></div>
+    <div class="stat"><div class="k">오늘 반출</div><div class="v num" id="sOut" style="color:var(--out)">–<small>장</small></div></div>
+  </section>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="fTitle">
+      <div class="card-head"><h2 id="fTitle">입고 · 반출 등록</h2></div>
+      <form id="form" autocomplete="off">
+        <label>그룹
+          <input id="fGroup" list="groupList" placeholder="목록에서 고르거나 새 그룹 이름을 바로 입력" required>
+          <datalist id="groupList"></datalist>
+        </label>
+        <div class="row2">
+          <label>구분
+            <select id="fCat">
+              <option>반송 이관</option>
+              <option>대량입고 이관</option>
+              <option>글로벌 대량입고 이관</option>
+              <option>앨범깡 이관</option>
+            </select>
+          </label>
+          <label>날짜<input id="fDate" type="date" required></label>
+        </div>
+        <label>수량 (장)
+          <input id="fQty" type="number" inputmode="numeric" min="1" step="1" placeholder="0" required>
+        </label>
+        <div class="hint" id="fHint">그룹을 고르면 현재 재고가 보여요.</div>
+        <label>메모 (선택)
+          <input id="fMemo" list="memoList" placeholder="예: 일본 오프라인, 8/24 대량입고">
+          <datalist id="memoList"><option value="일본 오프라인"><option value="대량입고"><option value="검수 후 입고"><option value="판매 반출"></datalist>
+        </label>
+        <div class="btns">
+          <button type="button" class="b-in" id="bIn">＋ 입고</button>
+          <button type="button" class="b-out" id="bOut">－ 반출</button>
+        </div>
+        <div class="flash" id="flash" hidden></div>
+      </form>
+      <div class="bulk">
+        <div class="card-head" style="margin:0"><h2>엑셀로 일괄 등록</h2><button type="button" id="bTpl" class="mini" hidden>양식 받기</button></div>
+        <p class="muted" style="margin:0;font-size:12px">열: <b>날짜 · 유형(입고/반출) · 그룹 · 구분 · 수량(장) · 메모</b>. 메모는 비워도 되고, 날짜가 비면 오늘로 들어가요.</p>
+        <input id="bulkFile" type="file" accept=".xlsx,.xls,.csv" aria-label="일괄 등록 엑셀 파일">
+        <div id="bulkSummary" class="hint"></div>
+        <div class="tbl" id="bulkTbl" hidden style="max-height:260px">
+          <table><thead><tr><th>행</th><th>유형</th><th>그룹</th><th>구분</th><th class="r">수량</th><th>확인</th></tr></thead><tbody id="bulkBody"></tbody></table>
+        </div>
+        <div class="btns" id="bulkBtns" hidden>
+          <button type="button" class="b-in" id="bBulkGo">등록하기</button>
+          <button type="button" id="bBulkCancel">취소</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="sTitle">
+      <div class="card-head">
+        <h2 id="sTitle">현재 재고 현황</h2>
+        <div class="tools">
+          <input id="sSearch" type="search" placeholder="그룹 검색">
+          <select id="sSort" aria-label="정렬">
+            <option value="major">주요그룹 먼저</option>
+            <option value="qty">수량 많은 순</option>
+            <option value="name">이름 순</option>
+            <option value="recent">최근 변동 순</option>
+          </select>
+        </div>
+      </div>
+      <div class="chips" id="catChips" style="margin-bottom:12px">
+        <button type="button" class="chip" data-f="all" aria-pressed="true">전체</button>
+        <button type="button" class="chip" data-f="major" aria-pressed="false">★ 주요그룹만</button>
+        <button type="button" class="chip" id="bMajorPanel" style="margin-left:auto">주요그룹 엑셀로 지정</button>
+      </div>
+      <div class="majorpanel" id="majorPanel" hidden>
+        <p>엑셀(.xlsx·.xls·.csv) 첫 번째 열에 그룹 이름을 적어 올리면, 그 목록이 주요그룹으로 지정돼요. <span class="muted">"NCT (주요그룹)"처럼 적어도 괄호 부분은 빼고 읽어요. 첫 줄이 "그룹" 같은 제목이면 건너뛰어요.</span></p>
+        <input id="majorFile" type="file" accept=".xlsx,.xls,.csv">
+        <div id="majorPreview" class="muted"></div>
+        <div class="tools">
+          <button type="button" id="bMajorApply" disabled>이 목록으로 교체</button>
+          <button type="button" id="bMajorAdd" disabled>기존 목록에 추가</button>
+          <button type="button" id="bMajorClose">닫기</button>
+        </div>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead><tr id="stockHead"><th>그룹</th><th class="r">현재 재고</th><th>최근 변동</th><th></th></tr></thead>
+          <tbody id="stockBody"><tr><td colspan="4" class="empty">재고 데이터를 불러오는 중이에요.</td></tr></tbody>
+        </table>
+      </div>
+      <p class="foot" id="stockFoot"></p>
+    </section>
+  </div>
+
+  <section class="card" aria-labelledby="hTitle">
+    <div class="card-head">
+      <h2 id="hTitle">재고 출입 내역</h2>
+      <div class="tools">
+        <input id="hSearch" type="search" placeholder="그룹·메모 검색">
+        <select id="hType" aria-label="유형">
+          <option value="">전체</option><option value="in">입고만</option><option value="out">반출만</option>
+        </select>
+        <input id="hFrom" type="date" aria-label="시작일" style="width:auto">
+        <input id="hTo" type="date" aria-label="종료일" style="width:auto">
+        <button type="button" id="bCsv" hidden>CSV 내보내기</button>
+      </div>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>일시</th><th>유형</th><th>그룹</th><th>구분</th><th class="r">수량</th><th class="r">처리 후 재고</th><th>메모</th><th>담당</th><th></th></tr></thead>
+        <tbody id="histBody"><tr><td colspan="9" class="empty">내역을 불러오는 중이에요.</td></tr></tbody>
+      </table>
+    </div>
+    <p class="foot" id="histFoot"></p>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(() => {
+  const STD_CATS = ["반송 이관","대량입고 이관","글로벌 대량입고 이관","앨범깡 이관"];
+  const SHORT = {"반송 이관":"반송","대량입고 이관":"대량입고","글로벌 대량입고 이관":"글로벌","앨범깡 이관":"앨범깡"};
+  let majors = new Set(), majorVersionReady = false, pendingMajor = [];
+  let groupMap = new Map(); // group -> {group, qty, last, byCat:{}}
+  let viewFilter = "all";
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
+  const todayStr = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+  const keyOf = (g, c) => g + "\u0001" + c;
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  let db = null, user = null, myId = null, canWrite = true, downloads = null;
+  let moves = [];          // all move docs, sorted asc by at
+  let stock = new Map();   // key -> {group,cat,qty,inSum,outSum,last}
+  let after = new Map();   // move id -> balance after
+  let names = {};
+  let catFilter = "전체";
+
+  $("fDate").value = todayStr();
+
+  function setStatus(on, text){ $("dot").classList.toggle("on", on); $("statusText").textContent = text; }
+  function flash(msg, kind){ const f = $("flash"); f.textContent = msg; f.className = "flash " + (kind||""); f.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => f.hidden = true, 4000); }
+
+  function recompute(){
+    stock = new Map(); after = new Map();
+    for (const m of moves){
+      const k = keyOf(m.group, m.category);
+      let s = stock.get(k);
+      if (!s){ s = {group:m.group, cat:m.category, qty:0, inSum:0, outSum:0, last:""}; stock.set(k, s); }
+      if (m.type === "in"){ s.qty += m.qty; s.inSum += m.qty; } else { s.qty -= m.qty; s.outSum += m.qty; }
+      if (m.at > s.last) s.last = m.at;
+      after.set(m.id, s.qty);
+    }
+    groupMap = new Map();
+    for (const s of stock.values()){
+      let g = groupMap.get(s.group);
+      if (!g){ g = {group:s.group, qty:0, last:"", byCat:{}}; groupMap.set(s.group, g); }
+      g.qty += s.qty; g.byCat[s.cat] = (g.byCat[s.cat]||0) + s.qty;
+      if (s.last > g.last) g.last = s.last;
+    }
+  }
+  function catColumns(){
+    const extra = [...new Set([...stock.values()].map(s => s.cat))].filter(c => !STD_CATS.includes(c));
+    return [...STD_CATS, ...extra];
+  }
+  const majorBadge = (g) => majors.has(g) ? `<span class="major">주요그룹</span>` : "";
+
+  function renderStats(){
+    let total = 0, groups = 0, tin = 0, tout = 0; const t = todayStr();
+    for (const s of stock.values()){ total += s.qty; if (s.qty > 0) groups++; }
+    for (const m of moves){ if ((m.date||m.at.slice(0,10)) === t){ if (m.type==="in") tin += m.qty; else tout += m.qty; } }
+    $("sTotal").innerHTML = fmt(total) + "<small>장</small>";
+    $("sGroups").innerHTML = fmt(groups) + "<small>개</small>";
+    $("sIn").innerHTML = fmt(tin) + "<small>장</small>";
+    $("sOut").innerHTML = fmt(tout) + "<small>장</small>";
+    const gl = [...new Set(moves.map(m => m.group))].sort((a,b)=>a.localeCompare(b,"ko"));
+    $("groupList").innerHTML = gl.map(g => `<option value="${esc(g)}">`).join("");
+  }
+
+  function renderChips(){
+    $("catChips").querySelectorAll("[data-f]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.f === viewFilter)));
+  }
+
+  function renderStock(){
+    const q = $("sSearch").value.trim().toLowerCase();
+    const sort = $("sSort").value;
+    const cols = catColumns();
+    $("stockHead").innerHTML = `<th>그룹</th><th class="r">현재 재고</th>` + cols.map(c => `<th class="r sub" title="${esc(c)}">${esc(SHORT[c]||c)}</th>`).join("") + `<th>최근 변동</th><th></th>`;
+    const span = cols.length + 4;
+    let rows = [...groupMap.values()].filter(g => (viewFilter!=="major" || majors.has(g.group)) && (!q || g.group.toLowerCase().includes(q)));
+    if (sort === "qty") rows.sort((a,b)=>b.qty-a.qty);
+    else if (sort === "name") rows.sort((a,b)=>a.group.localeCompare(b.group,"ko"));
+    else if (sort === "major") rows.sort((a,b)=>(majors.has(b.group)-majors.has(a.group)) || b.qty-a.qty);
+    else rows.sort((a,b)=>b.last.localeCompare(a.last));
+    const max = Math.max(1, ...rows.map(r=>r.qty));
+    const sum = rows.reduce((a,r)=>a+r.qty,0);
+    if (!rows.length){
+      $("stockBody").innerHTML = `<tr><td colspan="${span}" class="empty">${moves.length ? (viewFilter==="major" && !majors.size ? "아직 지정된 주요그룹이 없어요. 그룹 옆 ☆를 누르거나 엑셀로 지정해 주세요." : "조건에 맞는 그룹이 없어요.") : "아직 등록된 재고가 없어요. 왼쪽에서 그룹과 수량을 입력하고 ＋ 입고를 눌러 첫 재고를 등록하세요."}</td></tr>`;
+    } else {
+      $("stockBody").innerHTML = rows.map(g => `<tr>
+        <td class="g"><button type="button" class="star ${majors.has(g.group)?"on":""}" data-star="${esc(g.group)}" aria-label="주요그룹 지정" title="주요그룹 지정/해제" ${canWrite&&db?"":"disabled"}>${majors.has(g.group)?"★":"☆"}</button>${esc(g.group)}${majorBadge(g.group)}</td>
+        <td class="r num ${g.qty<=0?"zero":""}"><b>${fmt(g.qty)}</b><span class="bar"><i style="width:${Math.max(0,g.qty)/max*100}%"></i></span></td>
+        ${cols.map(c => { const v = g.byCat[c]; return `<td class="r num catv ${v?"":"zero"}">${v==null?"–":fmt(v)}</td>`; }).join("")}
+        <td class="num" style="color:var(--muted)">${esc(g.last.slice(0,10))}</td>
+        <td><button type="button" class="mini in" data-pick="${esc(g.group)}" data-mode="in" ${canWrite?"":"disabled"}>＋</button>
+            <button type="button" class="mini out" data-pick="${esc(g.group)}" data-mode="out" ${canWrite?"":"disabled"}>－</button></td></tr>`).join("");
+    }
+    $("stockFoot").textContent = rows.length ? `${rows.length}개 그룹 · 합계 ${fmt(sum)}장` : "";
+  }
+
+  async function saveMajors(next){
+    if (!db) return;
+    const names = [...next].sort((a,b)=>a.localeCompare(b,"ko"));
+    try { await db.doc("config/majorGroups").set({names, updatedAt:new Date().toISOString()}); return true; }
+    catch { flash("주요그룹을 저장하지 못했어요. 권한을 확인해 주세요.", "bad"); return false; }
+  }
+
+  function filteredHistory(){
+    const q = $("hSearch").value.trim().toLowerCase(), t = $("hType").value, from = $("hFrom").value, to = $("hTo").value;
+    return moves.filter(m => {
+      const d = m.date || m.at.slice(0,10);
+      if (t && m.type !== t) return false;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      if (q && !(m.group.toLowerCase().includes(q) || (m.memo||"").toLowerCase().includes(q))) return false;
+      return true;
+    }).reverse();
+  }
+
+  function renderHistory(){
+    const rows = filteredHistory();
+    const shown = rows.slice(0, 500);
+    if (!rows.length){
+      $("histBody").innerHTML = `<tr><td colspan="9" class="empty">${moves.length ? "조건에 맞는 내역이 없어요." : "입고나 반출을 등록하면 여기에 기록이 쌓여요."}</td></tr>`;
+    } else {
+      $("histBody").innerHTML = shown.map(m => {
+        const d = new Date(m.at); const time = isNaN(d) ? "" : d.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:false});
+        const who = m.by ? (names[m.by] || "—") : "—";
+        return `<tr>
+          <td class="num">${esc(m.date || m.at.slice(0,10))} <span style="color:var(--muted)">${time}</span></td>
+          <td><span class="pill ${m.type}">${m.type==="in"?"입고":"반출"}</span></td>
+          <td class="g">${esc(m.group)}${majorBadge(m.group)}</td><td><span class="cat">${esc(m.category)}</span></td>
+          <td class="r num ${m.type==="in"?"qin":"qout"}">${m.type==="in"?"+":"−"}${fmt(m.qty)}</td>
+          <td class="r num">${fmt(after.get(m.id) ?? 0)}</td>
+          <td class="memo" title="${esc(m.memo)}">${esc(m.memo)}</td>
+          <td style="color:var(--muted)">${esc(who)}</td>
+          <td>${canWrite?`<button type="button" class="mini del" data-del="${esc(m.id)}">삭제</button>`:""}</td></tr>`;
+      }).join("");
+    }
+    let tin=0,tout=0; for (const m of rows){ if (m.type==="in") tin+=m.qty; else tout+=m.qty; }
+    $("histFoot").textContent = rows.length ? `${rows.length}건${rows.length>500?" (최근 500건 표시)":""} · 입고 ${fmt(tin)}장 · 반출 ${fmt(tout)}장` : "";
+  }
+
+  async function resolveNames(){
+    if (!user) return;
+    const ids = [...new Set(moves.map(m=>m.by).filter(Boolean))].filter(id => !(id in names));
+    if (!ids.length) return;
+    try { const ps = await user.profiles(ids); for (const id of ids) names[id] = ps?.[id]?.name || "팀원"; renderHistory(); } catch {}
+  }
+
+  function renderAll(){ recompute(); renderStats(); renderChips(); renderStock(); renderHistory(); updateHint(); resolveNames(); }
+
+  function currentQtyInput(){
+    const v = parseFloat($("fQty").value);
+    return isFinite(v) && v > 0 ? Math.round(v) : 0;
+  }
+  function updateHint(){
+    const g = $("fGroup").value.trim(), c = $("fCat").value, n = currentQtyInput(), h = $("fHint");
+    h.classList.remove("err");
+    if (!g){ h.textContent = "그룹을 고르면 현재 재고가 보여요."; return; }
+    const s = stock.get(keyOf(g,c)); const cur = s ? s.qty : 0;
+    const unitNote = "";
+    if (!groupMap.has(g)){ h.innerHTML = `<b style="color:var(--accent);font-family:inherit">새 그룹</b> · 입고하면 목록에 바로 추가돼요${unitNote}`; return; }
+    h.innerHTML = `현재 ${esc(g)}${majors.has(g)?" (주요그룹)":""} · ${esc(c)} 재고 <b>${fmt(cur)}</b>장 · 그룹 전체 <b>${fmt(groupMap.get(g).qty)}</b>장${unitNote}`;
+  }
+
+  async function submit(type){
+    if (!db){ flash("데이터 저장소에 연결되지 않아 저장할 수 없어요. 로그인 상태를 확인해 주세요.", "bad"); return; }
+    const group = $("fGroup").value.trim(), category = $("fCat").value, qty = currentQtyInput();
+    const date = $("fDate").value || todayStr(), memo = $("fMemo").value.trim();
+    if (!group){ flash("그룹 이름을 입력해 주세요.", "bad"); $("fGroup").focus(); return; }
+    if (!qty){ flash("수량을 1장 이상 입력해 주세요.", "bad"); $("fQty").focus(); return; }
+    const cur = stock.get(keyOf(group,category))?.qty ?? 0;
+    if (type === "out" && qty > cur){
+      const h = $("fHint"); h.classList.add("err"); h.textContent = `현재 재고 ${fmt(cur)}장보다 많이 반출할 수 없어요.`; return;
+    }
+    const now = new Date(); const time = now.toTimeString().slice(0,8);
+    const at = new Date(`${date}T${time}`).toISOString();
+    const body = {type, group, category, qty, date, at, memo, createdAt: now.toISOString()};
+    if (myId) body.by = myId;
+    $("bIn").disabled = $("bOut").disabled = true;
+    try {
+      await db.collection("moves").add(body);
+      flash(`${group} ${fmt(qty)}장 ${type==="in"?"입고":"반출"} 처리했어요.`, "ok");
+      $("fQty").value = ""; $("fMemo").value = ""; $("fQty").focus();
+    } catch (e) {
+      if (e?.code === "invalid_argument"){ canWrite = false; applyWrite(); flash("이 문서에서는 보기 권한만 있어 등록할 수 없어요.", "bad"); }
+      else if (e?.code === "quota_exceeded") flash("저장 공간이 가득 찼어요. 관리자에게 오래된 내역 정리를 요청해 주세요.", "bad");
+      else flash("저장하지 못했어요. 잠시 후 다시 시도해 주세요.", "bad");
+    } finally { applyWrite(); }
+  }
+
+  function applyWrite(){
+    $("bIn").disabled = $("bOut").disabled = !canWrite || !db;
+  }
+
+  // events
+  $("bIn").addEventListener("click", () => submit("in"));
+  $("bOut").addEventListener("click", () => submit("out"));
+  $("form").addEventListener("submit", (e) => { e.preventDefault(); submit("in"); });
+  ["fGroup","fCat","fQty"].forEach(id => $(id).addEventListener("input", updateHint));
+  $("sSearch").addEventListener("input", renderStock);
+  $("sSort").addEventListener("change", renderStock);
+  ["hSearch","hType","hFrom","hTo"].forEach(id => $(id).addEventListener("input", renderHistory));
+  $("catChips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-f]"); if (!b) return; viewFilter = b.dataset.f; renderChips(); renderStock();
+  });
+  $("stockBody").addEventListener("click", async (e) => {
+    const st = e.target.closest("[data-star]");
+    if (st){
+      const g = st.dataset.star, next = new Set(majors);
+      next.has(g) ? next.delete(g) : next.add(g);
+      st.disabled = true;
+      if (await saveMajors(next)) flash(`${g}을(를) 주요그룹${next.has(g)?"으로 지정했어요":"에서 해제했어요"}.`, "ok");
+      st.disabled = false; return;
+    }
+    const b = e.target.closest("[data-pick]"); if (!b) return;
+    const g = groupMap.get(b.dataset.pick); if (!g) return;
+    $("fGroup").value = g.group;
+    if (b.dataset.mode === "out"){
+      const best = Object.entries(g.byCat).filter(([c]) => STD_CATS.includes(c)).sort((a,b)=>b[1]-a[1])[0];
+      if (best && best[1] > 0) $("fCat").value = best[0];
+    }
+    updateHint();
+    $("fQty").focus(); $("fQty").scrollIntoView({block:"center", behavior:"smooth"});
+    flash(`${g.group} 선택됨 · 구분과 수량 확인 후 ${b.dataset.mode==="in"?"＋ 입고":"－ 반출"}을 눌러주세요.`);
+  });
+
+  // 주요그룹 엑셀 지정
+  $("bMajorPanel").addEventListener("click", () => { $("majorPanel").hidden = !$("majorPanel").hidden; });
+  $("bMajorClose").addEventListener("click", () => { $("majorPanel").hidden = true; });
+  $("majorFile").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0]; pendingMajor = [];
+    $("bMajorApply").disabled = $("bMajorAdd").disabled = true;
+    if (!f) { $("majorPreview").textContent = ""; return; }
+    if (!window.XLSX){ $("majorPreview").textContent = "엑셀 읽기 도구를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요."; return; }
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), {type:"array"});
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, blankrows:false, defval:""});
+      const seen = new Set();
+      rows.forEach((r, i) => {
+        let v = String(r.find(c => String(c).trim() !== "") ?? "").replace(/\(\s*주요\s*그룹\s*\)/g, "").trim();
+        if (!v) return;
+        if (i === 0 && /^(그룹|그룹명|주요\s*그룹|group)$/i.test(v)) return;
+        // 기존 그룹과 대소문자만 다른 경우 기존 표기로 맞춤
+        const exist = [...groupMap.keys()].find(k => k.toLowerCase() === v.toLowerCase());
+        seen.add(exist || v);
+      });
+      pendingMajor = [...seen];
+      const unknown = pendingMajor.filter(g => !groupMap.has(g));
+      $("majorPreview").innerHTML = pendingMajor.length
+        ? `<b style="color:var(--fg)">${pendingMajor.length}개 그룹</b>을 읽었어요: ${pendingMajor.map(esc).join(", ")}` + (unknown.length ? `<br>아직 재고가 없는 그룹 ${unknown.length}개(${unknown.map(esc).join(", ")})도 지정되며, 입고되면 표시돼요.` : "")
+        : "그룹 이름을 찾지 못했어요. 첫 번째 열에 그룹 이름을 적었는지 확인해 주세요.";
+      $("bMajorApply").disabled = $("bMajorAdd").disabled = !pendingMajor.length || !canWrite || !db;
+    } catch { $("majorPreview").textContent = "파일을 읽지 못했어요. .xlsx, .xls, .csv 파일인지 확인해 주세요."; }
+  });
+  async function applyMajor(replace){
+    const next = replace ? new Set(pendingMajor) : new Set([...majors, ...pendingMajor]);
+    $("bMajorApply").disabled = $("bMajorAdd").disabled = true;
+    if (await saveMajors(next)){
+      flash(`주요그룹 ${next.size}개로 ${replace?"교체":"업데이트"}했어요.`, "ok");
+      $("majorPanel").hidden = true; $("majorFile").value = ""; $("majorPreview").textContent = ""; pendingMajor = [];
+    } else { $("bMajorApply").disabled = $("bMajorAdd").disabled = false; }
+  }
+  // ===== 엑셀 일괄 등록 =====
+  let bulkRows = [];
+  const H = {
+    date:["날짜","일자","date"], type:["유형","입출","구분(입고/반출)","type"], group:["그룹","그룹명","group"],
+    cat:["구분","분류","category"], qty:["수량","수량(장)","장수","qty"], memo:["메모","비고","memo"]
+  };
+  function normDate(v){
+    if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() - v.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    const s = String(v ?? "").trim(); if (!s) return todayStr();
+    let m = s.match(/^(\d{4})[.\-\/ ]\s*(\d{1,2})[.\-\/ ]\s*(\d{1,2})/);
+    if (m) return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+    m = s.match(/^(\d{1,2})[.\-\/](\d{1,2})$/);
+    if (m) return `${new Date().getFullYear()}-${m[1].padStart(2,"0")}-${m[2].padStart(2,"0")}`;
+    return null;
+  }
+  function normCat(v){
+    const s = String(v ?? "").replace(/\s+/g,"");
+    return STD_CATS.find(c => c.replace(/\s+/g,"") === s || (SHORT[c] && SHORT[c].replace(/\s+/g,"") === s)) || null;
+  }
+  function normType(v){
+    const s = String(v ?? "").trim().toLowerCase();
+    if (["입고","in","+","입"].includes(s)) return "in";
+    if (["반출","출고","out","-","출"].includes(s)) return "out";
+    return null;
+  }
+  function resetBulk(){ bulkRows = []; $("bulkFile").value = ""; $("bulkSummary").textContent = ""; $("bulkSummary").className = "hint"; $("bulkTbl").hidden = true; $("bulkBtns").hidden = true; }
+  $("bulkFile").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0]; if (!f) return resetBulk();
+    if (!window.XLSX){ $("bulkSummary").textContent = "엑셀 읽기 도구를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요."; return; }
+    let rows;
+    try {
+      const wb = XLSX.read(await f.arrayBuffer(), {type:"array", cellDates:true});
+      rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, blankrows:false, defval:""});
+    } catch { $("bulkSummary").textContent = "파일을 읽지 못했어요. .xlsx, .xls, .csv 파일인지 확인해 주세요."; return; }
+    // 헤더 행 찾기
+    const hi = rows.findIndex(r => r.some(c => H.group.includes(String(c).trim())));
+    if (hi < 0){ $("bulkSummary").className = "hint err"; $("bulkSummary").textContent = "'그룹' 열 제목을 찾지 못했어요. 양식의 첫 줄 제목을 그대로 써 주세요."; return; }
+    const head = rows[hi].map(c => String(c).trim());
+    const col = {}; for (const k in H) col[k] = head.findIndex(h => H[k].includes(h));
+    const sim = new Map(); for (const [k,s] of stock) sim.set(k, s.qty);
+    bulkRows = rows.slice(hi+1).map((r, i) => {
+      const get = (k) => col[k] >= 0 ? r[col[k]] : "";
+      const group = String(get("group") ?? "").trim();
+      if (!group && !String(get("qty")).trim()) return null;
+      let type = col.type >= 0 ? normType(get("type")) : null;
+      let rawQty = parseFloat(String(get("qty")).replace(/,/g,""));
+      if (!type && isFinite(rawQty)) type = rawQty < 0 ? "out" : "in";
+      const cat = normCat(get("cat")), date = normDate(get("date"));
+      const qty = isFinite(rawQty) ? Math.round(Math.abs(rawQty)) : 0;
+      const memo = String(get("memo") ?? "").trim();
+      let err = "";
+      if (!group) err = "그룹이 비어 있어요";
+      else if (!type) err = "유형은 입고/반출로 적어 주세요";
+      else if (!cat) err = "구분이 4가지 중 하나가 아니에요";
+      else if (!qty) err = "수량이 없어요";
+      else if (!date) err = "날짜 형식을 읽지 못했어요";
+      if (!err){
+        const k = keyOf(group, cat), cur = sim.get(k) || 0;
+        if (type === "out" && qty > cur) err = `재고 ${fmt(cur)}장보다 많이 반출해요`;
+        else sim.set(k, cur + (type==="in" ? qty : -qty));
+      }
+      return {row: hi + i + 2, group, type, category:cat, qty, date, memo, err, isNew: group && !groupMap.has(group)};
+    }).filter(Boolean);
+    const bad = bulkRows.filter(r => r.err).length, good = bulkRows.length - bad;
+    $("bulkBody").innerHTML = bulkRows.map(r => `<tr class="${r.err?"bad":""}"><td class="num">${r.row}</td>
+      <td>${r.type?`<span class="pill ${r.type}">${r.type==="in"?"입고":"반출"}</span>`:"–"}</td>
+      <td class="g">${esc(r.group)}${r.isNew&&!r.err?' <span class="cat">새 그룹</span>':""}</td><td>${esc(r.category||"–")}</td>
+      <td class="r num">${r.qty?fmt(r.qty):"–"}</td>
+      <td>${r.err?`<span class="bad-t">${esc(r.err)}</span>`:'<span class="ok-t">OK</span>'}</td></tr>`).join("");
+    $("bulkTbl").hidden = !bulkRows.length;
+    const s = $("bulkSummary");
+    s.className = "hint" + (bad ? " err" : "");
+    s.innerHTML = bulkRows.length ? `${bulkRows.length}행 중 <b>${good}</b>건 등록 가능${bad?` · 오류 ${bad}건은 빼고 등록돼요`:""}` : "등록할 행이 없어요.";
+    $("bulkBtns").hidden = !good;
+    $("bBulkGo").textContent = `${good}건 등록하기`;
+    $("bBulkGo").disabled = !canWrite || !db;
+  });
+  $("bBulkCancel").addEventListener("click", resetBulk);
+  $("bBulkGo").addEventListener("click", async () => {
+    const ok = bulkRows.filter(r => !r.err); if (!ok.length || !db) return;
+    $("bBulkGo").disabled = true;
+    const base = Date.now(); let done = 0;
+    for (const r of ok){
+      const at = new Date(`${r.date}T${new Date(base).toTimeString().slice(0,8)}`).getTime() + done; // 같은 파일 안 순서 유지
+      const body = {type:r.type, group:r.group, category:r.category, qty:r.qty, date:r.date, at:new Date(at).toISOString(), memo:r.memo || "엑셀 일괄 등록", createdAt:new Date().toISOString(), source:"excel"};
+      if (myId) body.by = myId;
+      try { await db.collection("moves").add(body); done++; $("bBulkGo").textContent = `등록 중… ${done}/${ok.length}`; }
+      catch (e) { flash(`${done}건 등록 후 멈췄어요 (${r.row}행). ${e?.code==="quota_exceeded"?"저장 공간이 가득 찼어요.":"잠시 후 남은 행만 다시 올려 주세요."}`, "bad"); $("bBulkGo").disabled = false; return; }
+    }
+    flash(`엑셀에서 ${done}건을 등록했어요.`, "ok"); resetBulk();
+  });
+  $("bTpl").addEventListener("click", async () => {
+    if (!window.XLSX || !downloads) return;
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["날짜","유형","그룹","구분","수량","메모"],
+      [todayStr(),"입고","예시그룹","대량입고 이관",100,"예시 행 · 지우고 쓰세요"],
+      [todayStr(),"반출","예시그룹","대량입고 이관",20,"일본 오프라인"],
+    ]);
+    ws["!cols"] = [{wch:12},{wch:8},{wch:18},{wch:20},{wch:8},{wch:24}];
+    const ref = XLSX.utils.aoa_to_sheet([["구분에 쓸 수 있는 값"],...STD_CATS.map(c=>[c]),[""],["유형: 입고 / 반출"],["수량: 장 단위 숫자"]]);
+    ref["!cols"] = [{wch:36}];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "등록"); XLSX.utils.book_append_sheet(wb, ref, "안내");
+    const out = XLSX.write(wb, {bookType:"xlsx", type:"array"});
+    try { await downloads.save({filename:"POCAIVE_일괄등록_양식.xlsx", data:new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}); }
+    catch (e) { if (e?.code !== "cancelled") flash("양식을 저장하지 못했어요.", "bad"); }
+  });
+
+  $("bMajorApply").addEventListener("click", () => applyMajor(true));
+  $("bMajorAdd").addEventListener("click", () => applyMajor(false));
+  $("histBody").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-del]"); if (!b || !db) return;
+    if (!b.classList.contains("arm")){
+      b.classList.add("arm"); b.textContent = "삭제 확인";
+      setTimeout(() => { if (b.isConnected){ b.classList.remove("arm"); b.textContent = "삭제"; } }, 3000);
+      return;
+    }
+    b.disabled = true;
+    try { await db.doc("moves/" + b.dataset.del).delete(); flash("내역을 삭제했어요. 재고가 다시 계산됐어요.", "ok"); }
+    catch { flash("삭제하지 못했어요. 권한을 확인해 주세요.", "bad"); b.disabled = false; }
+  });
+  $("bCsv").addEventListener("click", async () => {
+    const rows = filteredHistory().slice().reverse();
+    const head = ["일자","시각","유형","그룹","구분","수량","처리후재고","메모","담당"];
+    const q = (v) => `"${String(v ?? "").replace(/"/g,'""')}"`;
+    const lines = [head.join(",")].concat(rows.map(m => {
+      const d = new Date(m.at);
+      return [m.date, isNaN(d)?"":d.toTimeString().slice(0,5), m.type==="in"?"입고":"반출", m.group, m.category, (m.type==="in"?1:-1)*m.qty, after.get(m.id) ?? 0, m.memo, m.by?(names[m.by]||""):""].map(q).join(",");
+    }));
+    try { await downloads.save({filename:`POCAIVE_출입내역_${todayStr()}.csv`, data:"﻿"+lines.join("\n")}); }
+    catch (e) { if (e?.code !== "cancelled") flash("파일을 저장하지 못했어요.", "bad"); }
+  });
+
+
+  // ===== GitHub Pages 등 독립 실행용: 브라우저 저장소(localStorage) 기반 DB =====
+  function makeLocalDB(){
+    const KEY = "pocaive-db-v1";
+    let store; try { store = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { store = {}; }
+    const subs = [];
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { flash("브라우저 저장 공간에 저장하지 못했어요.", "bad"); } };
+    const col = (name) => (store[name] ||= {});
+    const snapDoc = (id, x) => ({id, exists: x !== undefined, data: () => x, metadata:{fromCache:false, hasPendingWrites:false}});
+    const emit = () => subs.forEach(fn => fn());
+    window.addEventListener("storage", (e) => { if (e.key === KEY){ try { store = JSON.parse(e.newValue || "{}"); } catch {} emit(); } });
+    const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const docRef = (c, id) => ({
+      id, path: c + "/" + id,
+      async set(data){ col(c)[id] = JSON.parse(JSON.stringify(data)); save(); emit(); },
+      async delete(){ delete col(c)[id]; save(); emit(); },
+      onSnapshot(next){ const fn = () => next(snapDoc(id, col(c)[id])); subs.push(fn); fn(); return () => subs.splice(subs.indexOf(fn), 1); }
+    });
+    return {
+      collection(c){ return {
+        doc: (id) => docRef(c, id || rid()),
+        async add(data){ const r = docRef(c, rid()); await r.set(data); return r; },
+        onSnapshot(next){ const fn = () => { const docs = Object.entries(col(c)).map(([id, x]) => snapDoc(id, x)); next({docs, size: docs.length, empty: !docs.length}); }; subs.push(fn); fn(); return () => subs.splice(subs.indexOf(fn), 1); }
+      }; },
+      doc(path){ const [c, id] = path.split("/"); return docRef(c, id); }
+    };
+  }
+  const localDownloads = { async save({filename, data}){
+    const blob = data instanceof Blob ? data : new Blob([data], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  } };
+
+  // boot
+  (async () => {
+    const local = !window.claude?.use;
+    const [d, u, dl] = local ? [makeLocalDB(), null, localDownloads] : await Promise.all([claude.use("db"), claude.use("user"), claude.use("downloads")]);
+    db = d; user = u; downloads = dl;
+    if (downloads){ $("bCsv").hidden = false; $("bTpl").hidden = false; }
+    if (user){
+      try { myId = await user.id(); } catch {}
+      try { const w = await user.can("data.write"); if (w === false) canWrite = false; } catch {}
+    }
+    applyWrite();
+    if (!db){ setStatus(false, "저장소 연결 안 됨 · 로그인 필요"); renderEmptyOffline(); return; }
+    db.collection("moves").onSnapshot((snap) => {
+      moves = snap.docs.map(s => { const x = s.data(); return {id:s.id, type:x.type==="out"?"out":"in", group:String(x.group||"(이름 없음)"), category:String(x.category||"B급 포카"), qty:Number(x.qty)||0, date:x.date||"", at:String(x.at||x.createdAt||""), memo:x.memo||"", by:x.by||""}; })
+        .sort((a,b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      setStatus(true, local ? `이 브라우저에 저장 · ${fmt(moves.length)}건` : canWrite ? `실시간 동기화 · ${fmt(moves.length)}건` : `보기 전용 · ${fmt(moves.length)}건`);
+      renderAll();
+    }, () => { setStatus(false, "연결이 끊겼어요 · 새로고침해 주세요"); });
+    db.doc("config/majorGroups").onSnapshot((snap) => {
+      const n = snap.exists ? (snap.data().names || []) : [];
+      majors = new Set(n.map(String));
+      renderStock(); renderHistory(); updateHint();
+    }, () => {});
+  })();
+
+  function renderEmptyOffline(){
+    $("stockBody").innerHTML = `<tr><td colspan="7" class="empty">로그인하면 팀 공용 재고 데이터가 표시돼요.</td></tr>`;
+    $("histBody").innerHTML = `<tr><td colspan="9" class="empty">로그인하면 출입 내역이 표시돼요.</td></tr>`;
+    applyWrite();
+  }
+})();
+</script>
+
+</body>
+</html>
