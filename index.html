@@ -251,7 +251,63 @@ th.sub{font-weight:500}
    ============================================================ */
 const SHEET_API_URL = "https://script.google.com/a/macros/infludeo.com/s/AKfycbyC22Wt3GiHWLt05FvTfkncLp1aN9M2C2iZUPgNSa11ELJyLfq985Gfv2rskatwc79M2Q/exec";
 
+/* ============================================================
+   그룹 별칭 — 오른쪽 이름으로 입력해도 왼쪽 대표 이름으로 저장·집계돼요.
+   대소문자와 띄어쓰기는 구분하지 않아요. 새 별칭은 줄을 추가하면 돼요.
+   ============================================================ */
+const GROUP_ALIASES = {
+  "&TEAM": ["앤팀"],
+  "A2O LITE": ["에이투오 라이트", "에투라"],
+  "ALLDAY PROJECT": ["올 데이 프로젝트", "올데프"],
+  "ALPHA DRIVE ONE": ["알파 드라이브 원", "알디원"],
+  "AND2BLE": ["앤더블"],
+  "BABYMONSTER": ["베이비 몬스터", "베몬"],
+  "BOYNEXTDOOR": ["보이 넥스트 도어", "보넥도"],
+  "BTS": ["방탄소년단", "방탄"],
+  "CORTIS": ["코르티스"],
+  "DAY6": ["데이식스"],
+  "ENHYPEN": ["엔하이픈"],
+  "EXO": ["엑소"],
+  "FLARE U": ["플레어유"],
+  "G-DRAGON": ["지드래곤", "지디"],
+  "Hearts2Hearts": ["하츠투하츠", "하투하"],
+  "ITZY": ["있지"],
+  "IU": ["아이유"],
+  "IVE": ["아이브"],
+  "KickFlip": ["킥플립"],
+  "KiiiKiii": ["키키"],
+  "LNGSHOT": ["롱샷"],
+  "NCT": ["엔시티"],
+  "NMIXX": ["엔믹스"],
+  "MEOVV": ["미야오"],
+  "P1harmony": ["피원하모니"],
+  "PLAVE": ["플레이브"],
+  "TWS": ["투어스"],
+  "TWICE": ["트와이스"],
+  "TXT": ["투모로우 바이 투게더", "투바투"],
+  "TUIDE": ["튜이드"],
+  "라이즈": ["riize"],
+  "레드벨벳": ["레벨"],
+  "블랙핑크": ["블핑"],
+  "샤이니": ["shinee"],
+  "세븐틴": ["SVT"],
+  "슈퍼주니어": ["슈주"],
+  "스트레이키즈": ["SKZ", "스키즈"],
+  "에이티즈": ["ATEEZ"],
+  "엑스디너리히어로즈": ["엑디즈"],
+  "제로베이스원": ["제베원"],
+  "프로미스나인": ["프미나", "프나"],
+};
+
 (() => {
+  // 별칭 → 대표 이름 (비교할 때는 소문자 + 공백 제거)
+  const aliasKey = (s) => String(s ?? "").toLowerCase().replace(/\s+/g, "");
+  const ALIAS_MAP = new Map();
+  for (const [name, list] of Object.entries(GROUP_ALIASES)){
+    ALIAS_MAP.set(aliasKey(name), name);
+    for (const a of list) ALIAS_MAP.set(aliasKey(a), name);
+  }
+  const canonGroup = (s) => { const t = String(s ?? "").trim(); return t ? (ALIAS_MAP.get(aliasKey(t)) || t) : t; };
   const STD_CATS = ["반송 이관","대량입고 이관","글로벌 대량입고 이관","앨범깡 이관"];
   const SHORT = {"반송 이관":"반송","대량입고 이관":"대량입고","글로벌 대량입고 이관":"글로벌","앨범깡 이관":"앨범깡"};
   let majors = new Set(), majorVersionReady = false, pendingMajor = [];
@@ -307,7 +363,7 @@ const SHEET_API_URL = "https://script.google.com/a/macros/infludeo.com/s/AKfycby
     $("sGroups").innerHTML = fmt(groups) + "<small>개</small>";
     $("sIn").innerHTML = fmt(tin) + "<small>장</small>";
     $("sOut").innerHTML = fmt(tout) + "<small>장</small>";
-    const gl = [...new Set(moves.map(m => m.group))].sort((a,b)=>a.localeCompare(b,"ko"));
+    const gl = [...new Set([...moves.map(m => m.group), ...majors, ...Object.keys(GROUP_ALIASES)])].sort((a,b)=>a.localeCompare(b,"ko"));
     $("groupList").innerHTML = gl.map(g => `<option value="${esc(g)}">`).join("");
   }
 
@@ -399,18 +455,18 @@ const SHEET_API_URL = "https://script.google.com/a/macros/infludeo.com/s/AKfycby
     return isFinite(v) && v > 0 ? Math.round(v) : 0;
   }
   function updateHint(){
-    const g = $("fGroup").value.trim(), c = $("fCat").value, n = currentQtyInput(), h = $("fHint");
+    const raw = $("fGroup").value.trim(), g = canonGroup(raw), c = $("fCat").value, n = currentQtyInput(), h = $("fHint");
     h.classList.remove("err");
     if (!g){ h.textContent = "그룹을 고르면 현재 재고가 보여요."; return; }
     const s = stock.get(keyOf(g,c)); const cur = s ? s.qty : 0;
-    const unitNote = "";
+    const unitNote = g !== raw ? ` · <b style="font-family:inherit">${esc(g)}</b>(으)로 등록돼요` : "";
     if (!groupMap.has(g)){ h.innerHTML = `<b style="color:var(--accent);font-family:inherit">새 그룹</b> · 입고하면 목록에 바로 추가돼요${unitNote}`; return; }
     h.innerHTML = `현재 ${esc(g)}${majors.has(g)?" (주요그룹)":""} · ${esc(c)} 재고 <b>${fmt(cur)}</b>장 · 그룹 전체 <b>${fmt(groupMap.get(g).qty)}</b>장${unitNote}`;
   }
 
   async function submit(type){
     if (!db){ flash("데이터 저장소에 연결되지 않아 저장할 수 없어요. 로그인 상태를 확인해 주세요.", "bad"); return; }
-    const group = $("fGroup").value.trim(), category = $("fCat").value, qty = currentQtyInput();
+    const group = canonGroup($("fGroup").value), category = $("fCat").value, qty = currentQtyInput();
     const date = $("fDate").value || todayStr(), memo = $("fMemo").value.trim();
     if (!group){ flash("그룹 이름을 입력해 주세요.", "bad"); $("fGroup").focus(); return; }
     if (!qty){ flash("수량을 1장 이상 입력해 주세요.", "bad"); $("fQty").focus(); return; }
@@ -485,6 +541,7 @@ const SHEET_API_URL = "https://script.google.com/a/macros/infludeo.com/s/AKfycby
       const seen = new Set();
       rows.forEach((r, i) => {
         let v = String(r.find(c => String(c).trim() !== "") ?? "").replace(/\(\s*주요\s*그룹\s*\)/g, "").trim();
+        if (v && !(i === 0 && /^(그룹|그룹명|주요\s*그룹|group)$/i.test(v))) v = canonGroup(v);
         if (!v) return;
         if (i === 0 && /^(그룹|그룹명|주요\s*그룹|group)$/i.test(v)) return;
         // 기존 그룹과 대소문자만 다른 경우 기존 표기로 맞춤
@@ -549,7 +606,7 @@ const SHEET_API_URL = "https://script.google.com/a/macros/infludeo.com/s/AKfycby
     const sim = new Map(); for (const [k,s] of stock) sim.set(k, s.qty);
     bulkRows = rows.slice(hi+1).map((r, i) => {
       const get = (k) => col[k] >= 0 ? r[col[k]] : "";
-      const group = String(get("group") ?? "").trim();
+      const group = canonGroup(get("group"));
       if (!group && !String(get("qty")).trim()) return null;
       let type = col.type >= 0 ? normType(get("type")) : null;
       let rawQty = parseFloat(String(get("qty")).replace(/,/g,""));
@@ -745,14 +802,14 @@ const SHEET_API_URL = "https://script.google.com/a/macros/infludeo.com/s/AKfycby
     applyWrite();
     if (!db){ setStatus(false, "저장소 연결 안 됨 · 로그인 필요"); renderEmptyOffline(); return; }
     db.collection("moves").onSnapshot((snap) => {
-      moves = snap.docs.map(s => { const x = s.data(); return {id:s.id, type:x.type==="out"?"out":"in", group:String(x.group||"(이름 없음)"), category:String(x.category||"B급 포카"), qty:Number(x.qty)||0, date:x.date||"", at:String(x.at||x.createdAt||""), memo:x.memo||"", by:x.by||""}; })
+      moves = snap.docs.map(s => { const x = s.data(); return {id:s.id, type:x.type==="out"?"out":"in", group:canonGroup(x.group)||"(이름 없음)", category:String(x.category||"B급 포카"), qty:Number(x.qty)||0, date:x.date||"", at:String(x.at||x.createdAt||""), memo:x.memo||"", by:x.by||""}; })
         .sort((a,b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
       setStatus(true, mode === "sheet" ? `구글 시트 연결 · ${fmt(moves.length)}건` : local ? `이 브라우저에만 저장 중 · ${fmt(moves.length)}건` : canWrite ? `실시간 동기화 · ${fmt(moves.length)}건` : `보기 전용 · ${fmt(moves.length)}건`);
       renderAll();
     }, () => { setStatus(false, "연결이 끊겼어요 · 새로고침해 주세요"); });
     db.doc("config/majorGroups").onSnapshot((snap) => {
       const n = snap.exists ? (snap.data().names || []) : [];
-      majors = new Set(n.map(String));
+      majors = new Set(n.map(canonGroup).filter(Boolean));
       renderStock(); renderHistory(); updateHint();
     }, () => {});
   })();
